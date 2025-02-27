@@ -1,0 +1,12 @@
+{
+  "name": "@tasgf/functions",
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "@tasgf/core": "*",
+    "sst": "*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8"
+  }
+}
