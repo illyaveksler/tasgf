@@ -19,7 +19,8 @@ export default $config({
         ports: [{ listen: "80/http" }],
       },
       image: {
-        dockerfile: "packages/server/Dockerfile",
+        // dockerfile: "packages/server/Dockerfile",
+        context: "packages/server"
       },
       dev: {
         command: "node --experimental-transform-types --watch packages/server/src/index.ts",
