@@ -10,11 +10,20 @@ export default $config({
     };
   },
   async run() {
-    const storage = await import("./infra/storage");
-    await import("./infra/api");
-
-    return {
-      MyBucket: storage.bucket.name,
-    };
+    const vpc = new sst.aws.Vpc("MyVpc");
+    const cluster = new sst.aws.Cluster("MyCluster", { vpc });
+  
+    new sst.aws.Service("MyService", {
+      cluster,
+      loadBalancer: {
+        ports: [{ listen: "80/http" }],
+      },
+      image: {
+        dockerfile: "packages/server/Dockerfile",
+      },
+      dev: {
+        command: "node --experimental-transform-types --watch packages/server/src/index.ts",
+      },
+    });
   },
 });

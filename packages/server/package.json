@@ -1,5 +1,5 @@
 {
-  "name": "@tasgf/core",
+  "name": "@tasgf/server",
   "type": "module",
   "version": "0.0.0",
   "scripts": {
@@ -12,9 +12,11 @@
     ]
   },
   "dependencies": {
+    "express": "^4.21.2",
     "sst": "*"
   },
   "devDependencies": {
+    "@types/express": "^5.0.0",
     "vitest": "^2"
   }
 }

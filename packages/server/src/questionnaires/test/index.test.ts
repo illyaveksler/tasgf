@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import { Example } from "../";
+import { Questionnaires } from "../questionnaires";
 
 test("Hello test", () => {
   const expected = "Hello, world!";
 
-  expect(Example.hello()).toEqual(expected);
+  expect(Questionnaires.hello()).toEqual(expected);
 });
