@@ -19,7 +19,6 @@ export default $config({
         ports: [{ listen: "80/http" }],
       },
       image: {
-        // dockerfile: "packages/server/Dockerfile",
         context: "packages/server"
       },
       dev: {
