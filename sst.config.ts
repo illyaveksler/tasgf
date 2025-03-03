@@ -4,48 +4,61 @@ export default $config({
   app(input) {
     return {
       name: "tasgf",
-      removal: input?.stage === "production" ? "retain" : "remove",
-      protect: ["production"].includes(input?.stage),
+      removal: "remove",
+      protect: false,
       home: "aws",
     };
   },
   async run() {
-    const vpc = new sst.aws.Vpc("MyVpc", { bastion: true });
-    const database = new sst.aws.Aurora("MyDatabase", {
-      engine: "postgres",
-      dataApi: true,
-      vpc
-    });
+    const vpc = new sst.aws.Vpc("MyVpc", { bastion: true, nat: "managed" });
+    const rds = new sst.aws.Postgres("MyPostgres", { vpc });
+  
+    const DATABASE_URL = $interpolate`postgresql://${rds.username}:${rds.password}@${rds.host}:${rds.port}/${rds.database}`;
+
     const cluster = new sst.aws.Cluster("MyCluster", { vpc });
   
     new sst.aws.Service("MyService", {
-      link: [database],
       cluster,
+      link: [rds],
+      environment: { DATABASE_URL },
       loadBalancer: {
         ports: [{ listen: "80/http" }],
       },
       image: {
-        context: "./packages/server"
+        context: "./packages/server",
       },
       dev: {
         command: "node --experimental-transform-types --watch ./src/index.ts",
       },
     });
 
-    new sst.x.DevCommand("Studio", {
-      link: [database],
+    const migrator = new sst.aws.Function("DatabaseMigrator", {
+      handler: "packages/server/src/db/migrator.handler",
+      link: [rds],
+      environment: { DATABASE_URL },
+      vpc,
+      copyFiles: [
+        {
+          from: "packages/server/drizzle",
+          to: "./migrations",
+        },
+      ],
+    });
+    
+    if (!$dev) {
+      new aws.lambda.Invocation("DatabaseMigratorInvocation", {
+        input: Date.now().toString(),
+        functionName: migrator.name,
+      });
+    }
+
+    new sst.x.DevCommand("Drizzle", {
+      link: [rds],
+      environment: { DATABASE_URL },
       dev: {
+        autostart: false,
         command: "npx drizzle-kit studio",
         directory: "./packages/server"
-      },
-    });
-
-    new sst.x.DevCommand("Migrate", {
-      link: [database],
-      dev: {
-        command: "npx drizzle-kit push",
-        directory: "./packages/server",
-        autostart: false
       },
     });
   },

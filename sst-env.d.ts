@@ -5,15 +5,16 @@
 
 declare module "sst" {
   export interface Resource {
-    "MyDatabase": {
-      "clusterArn": string
+    "DatabaseMigrator": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "MyPostgres": {
       "database": string
       "host": string
       "password": string
       "port": number
-      "reader": string
-      "secretArn": string
-      "type": "sst.aws.Aurora"
+      "type": "sst.aws.Postgres"
       "username": string
     }
     "MyService": {

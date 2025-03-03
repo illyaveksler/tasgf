@@ -7,10 +7,10 @@ const app = express();
 app.use(express.json());
 
 // Create a new questionnaire
-app.post("/questionnaires", (req, res) => {
+app.post("/questionnaires", async (req, res) => {
   const { title, description, questions } = req.body;
   try {
-    const newQuestionnaire = Questionnaires.createQuestionnaire(title, description, questions);
+    const newQuestionnaire = await Questionnaires.createQuestionnaire(title, description, questions);
     res.status(201).json(newQuestionnaire);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -18,14 +18,14 @@ app.post("/questionnaires", (req, res) => {
 });
 
 // Retrieve all questionnaires (summary)
-app.get("/questionnaires", (req, res) => {
-  const allQuestionnaires = Questionnaires.getAllQuestionnaires();
+app.get("/questionnaires", async (req, res) => {
+  const allQuestionnaires = await Questionnaires.getAllQuestionnaires();
   res.json(allQuestionnaires);
 });
 
 // Retrieve a specific questionnaire (full details)
-app.get("/questionnaires/:questionnaireId", (req, res): void => {
-  const questionnaire = Questionnaires.getQuestionnaire(parseInt(req.params.questionnaireId));
+app.get("/questionnaires/:questionnaireId", async (req, res): Promise<void> => {
+  const questionnaire = await Questionnaires.getQuestionnaire(parseInt(req.params.questionnaireId));
   if (!questionnaire) {
     res.status(404).json({ error: "Questionnaire not found." });
     return;
@@ -34,11 +34,11 @@ app.get("/questionnaires/:questionnaireId", (req, res): void => {
 });
 
 // Submit answers for a specific questionnaire
-app.post("/questionnaires/:questionnaireId/answers", (req, res) => {
+app.post("/questionnaires/:questionnaireId/answers", async (req, res) => {
   const questionnaireId = req.params.questionnaireId;
   const { answers } = req.body;
   try {
-    const submission = Questionnaires.submitAnswers(parseInt(questionnaireId), answers);
+    const submission = await Questionnaires.submitAnswers(parseInt(questionnaireId), answers);
     res.status(201).json(submission);
   } catch (error: any) {
     res.status(400).json({ error: error.message });

@@ -1,10 +1,9 @@
-FROM node:23-alpine
+FROM node:23-bullseye-slim
 
 WORKDIR /app/
 
-COPY package.json /app
+COPY ./ /app
+
 RUN npm install
 
-COPY . /app
-
-ENTRYPOINT ["node", "--experimental-transform-types", "src/index.ts"]
+ENTRYPOINT ["node", "--experimental-transform-types", "./src/index.ts"]
