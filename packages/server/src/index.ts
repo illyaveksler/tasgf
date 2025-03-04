@@ -1,5 +1,6 @@
 import express from "express";
 import { Questionnaires } from "./questionnaires/questionnaires.ts";
+import { StudentGroups } from "./questionnaires/studentGroups.ts";
 
 const PORT = 80;
 const app = express();
@@ -36,10 +37,21 @@ app.get("/questionnaires/:questionnaireId", async (req, res): Promise<void> => {
 // Submit answers for a specific questionnaire
 app.post("/questionnaires/:questionnaireId/answers", async (req, res) => {
   const questionnaireId = req.params.questionnaireId;
-  const { answers } = req.body;
+  const { studentId, answers } = req.body;
   try {
-    const submission = await Questionnaires.submitAnswers(parseInt(questionnaireId), answers);
+    const submission = await Questionnaires.submitAnswers(parseInt(questionnaireId), studentId, answers);
     res.status(201).json(submission);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/questionnaires/:questionnaireId/generate-groups", async (req, res) => {
+  const questionnaireId = parseInt(req.params.questionnaireId);
+  const groupSize = parseInt(req.query.groupSize as string) || 2;
+  try {
+    const groups = await StudentGroups.generateAndStoreGroups(questionnaireId, groupSize);
+    res.json({ groups });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
