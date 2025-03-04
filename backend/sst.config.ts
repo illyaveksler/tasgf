@@ -24,22 +24,19 @@ export default $config({
       loadBalancer: {
         ports: [{ listen: "80/http" }],
       },
-      image: {
-        context: "./packages/server",
-      },
       dev: {
         command: "node --experimental-transform-types --watch ./src/index.ts",
       },
     });
 
     const migrator = new sst.aws.Function("DatabaseMigrator", {
-      handler: "packages/server/src/db/migrator.handler",
+      handler: "src/db/migrator.handler",
       link: [rds],
       environment: { DATABASE_URL },
       vpc,
       copyFiles: [
         {
-          from: "packages/server/drizzle",
+          from: "drizzle",
           to: "./migrations",
         },
       ],
@@ -58,7 +55,6 @@ export default $config({
       dev: {
         autostart: false,
         command: "npx drizzle-kit studio",
-        directory: "./packages/server"
       },
     });
   },

@@ -1,5 +1,5 @@
 {
-  "name": "@tasgf/server",
+  "name": "@tasgf/backend",
   "type": "module",
   "version": "0.0.0",
   "scripts": {
@@ -17,13 +17,15 @@
     "express": "^4.21.2",
     "pg": "^8.13.3",
     "postgres-js": "^0.1.0",
-    "sst": "*",
+    "sst": "^3",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/pg": "^8.11.11",
     "drizzle-kit": "^0.30.5",
-    "vitest": "^2"
+    "vitest": "^2",
+    "@tsconfig/node23": "^23",
+    "typescript": "^5"
   }
 }
