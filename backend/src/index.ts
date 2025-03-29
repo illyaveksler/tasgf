@@ -1,11 +1,22 @@
 import express from "express";
+import { authenticateToken } from "./auth.ts";
 import { Questionnaires } from "./questionnaires/questionnaires.ts";
 import { StudentGroups } from "./questionnaires/studentGroups.ts";
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: any;
+    }
+  }
+}
 
 const PORT = 80;
 const app = express();
 
 app.use(express.json());
+
+app.use(authenticateToken);
 
 // Create a new questionnaire
 app.post("/questionnaires", async (req, res) => {
@@ -25,7 +36,7 @@ app.get("/questionnaires", async (req, res) => {
 });
 
 // Retrieve a specific questionnaire (full details)
-app.get("/questionnaires/:questionnaireId", async (req, res): Promise<void> => {
+app.get("/questionnaires/:questionnaireId", async (req, res) => {
   const questionnaire = await Questionnaires.getQuestionnaire(parseInt(req.params.questionnaireId));
   if (!questionnaire) {
     res.status(404).json({ error: "Questionnaire not found." });
@@ -46,6 +57,7 @@ app.post("/questionnaires/:questionnaireId/answers", async (req, res) => {
   }
 });
 
+// Generate groups of students based on answers to a questionnaire
 app.get("/questionnaires/:questionnaireId/generate-groups", async (req, res) => {
   const questionnaireId = parseInt(req.params.questionnaireId);
   const groupSize = parseInt(req.query.groupSize as string) || 2;

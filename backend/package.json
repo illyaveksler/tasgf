@@ -15,17 +15,18 @@
     "@aws-sdk/client-rds-data": "^3.758.0",
     "drizzle-orm": "^0.40.0",
     "express": "^4.21.2",
+    "google-auth-library": "^9.15.1",
     "pg": "^8.13.3",
     "postgres-js": "^0.1.0",
-    "sst": "^3",
+    "sst": "3.11.11",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@tsconfig/node23": "^23",
     "@types/express": "^5.0.0",
     "@types/pg": "^8.11.11",
     "drizzle-kit": "^0.30.5",
-    "vitest": "^2",
-    "@tsconfig/node23": "^23",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2"
   }
 }

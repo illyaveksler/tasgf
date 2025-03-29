@@ -22,7 +22,11 @@ export default $config({
       link: [rds],
       environment: { DATABASE_URL },
       loadBalancer: {
-        ports: [{ listen: "80/http" }],
+        domain: "sendsock.com",
+        rules: [
+          { listen: "443/https", forward: "80/http" },
+          { listen: "80/http", redirect: "443/https" }
+        ],
       },
       dev: {
         command: "node --experimental-transform-types --watch ./src/index.ts",
