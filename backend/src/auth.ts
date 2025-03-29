@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction, RequestHandler } from "express";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { OAuth2Client } from "google-auth-library";
 
 const CLIENT_ID = "556640136929-dh9v14r9g92nshgdalvf5odegulaj126.apps.googleusercontent.com";
