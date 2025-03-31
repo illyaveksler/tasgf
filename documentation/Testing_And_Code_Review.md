@@ -45,15 +45,15 @@
    - Create an AWS account.
    - Create a credentials file in `~/.aws/credentials` with your AWS access key and secret access key:
     ```
-echo "[default]
-aws_access_key_id = <YOUR_ACCESS_KEY_ID>
-aws_secret_access_key = <YOUR_SECRET_ACCESS_KEY>" >> `~/.aws/credentials
+   echo "[default]
+   aws_access_key_id = <YOUR_ACCESS_KEY_ID>
+   aws_secret_access_key = <YOUR_SECRET_ACCESS_KEY>" >> `~/.aws/credentials
     ```
    - Run the following commands to deploy the database:
-```
-sudo npx sst tunnel install
-npx sst dev
-```
+   ```
+   sudo npx sst tunnel install
+   npx sst dev
+   ```
 
 Note: If you don't have a domain on AWS, you will need to also replace lines 24-30 in `sst.config.ts` with the following as well:
 ```
