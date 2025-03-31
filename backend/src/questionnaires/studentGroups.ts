@@ -47,7 +47,7 @@ export namespace StudentGroups {
       .where(inArray(submissionAnswers.submissionId, submissionIds));
 
     // Map each submissionId to its array of answers (converted to numbers).
-    const submissionAnswersMap: { [key: number]: number[] } = {};
+    const submissionAnswersMap: Record<number, number[]> = {};
     for (const answerRecord of answersList) {
       if (!submissionAnswersMap[answerRecord.submissionId]) {
         submissionAnswersMap[answerRecord.submissionId] = [];
@@ -73,7 +73,7 @@ export namespace StudentGroups {
     const numGroups = Math.ceil(submissionsWithAverage.length / groupSize);
 
     // Initialize groups. Each group holds an array of student IDs and a running total of averages.
-    const groups: Array<{ studentIds: number[]; sum: number }> = [];
+    const groups: { studentIds: number[]; sum: number }[] = [];
     for (let i = 0; i < numGroups; i++) {
       groups.push({ studentIds: [], sum: 0 });
     }

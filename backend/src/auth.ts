@@ -17,7 +17,7 @@ export function asyncWrapper(fn: RequestHandler): RequestHandler {
  */
 export const authenticateToken = asyncWrapper(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  if (!authHeader?.startsWith("Bearer ")) {
     res.status(401).json({ error: "Missing or invalid authorization header" });
     return;
   }
