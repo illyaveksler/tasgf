@@ -84,7 +84,7 @@ describe("Questionnaires Module", () => {
         (q) => q.id === createdQuestionnaire.id
       );
       expect(found).toBeDefined();
-      expect(found!.title).toBe(title);
+      expect(found?.title).toBe(title);
     });
   });
 
@@ -106,11 +106,10 @@ describe("Questionnaires Module", () => {
         createdQuestionnaire.id
       );
       expect(fetchedQuestionnaire).toBeDefined();
-      expect(fetchedQuestionnaire!.id).toBe(createdQuestionnaire.id);
-      expect(Array.isArray(fetchedQuestionnaire!.questions)).toBe(true);
-      expect(fetchedQuestionnaire!.questions.length).toBe(1);
-      expect(fetchedQuestionnaire!.questions[0].questionText).toBe(
-        questionsInput[0].questionText
+      expect(fetchedQuestionnaire?.id).toBe(createdQuestionnaire.id);
+      expect(Array.isArray(fetchedQuestionnaire?.questions)).toBe(true);
+      expect(fetchedQuestionnaire?.questions.length).toBe(1);
+      expect(fetchedQuestionnaire?.questions[0].questionText).toBe(        questionsInput[0].questionText
       );
     });
 
