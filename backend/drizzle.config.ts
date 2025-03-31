@@ -1,14 +1,13 @@
 import { defineConfig } from "drizzle-kit";
+import { Resource } from "sst";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('Missing envrionment variable DATABASE_URL')
-}
+const DATABASE_URL = `postgresql://${Resource.MyPostgres.username}:${Resource.MyPostgres.password}@${Resource.MyPostgres.host}:${Resource.MyPostgres.port}/${Resource.MyPostgres.database}`
+
 
 export default defineConfig({
   dialect: 'postgresql',
   schema: './src/db/schema',
   dbCredentials: {
-    url: process.env.DATABASE_URL,
-    // ssl: { rejectUnauthorized: false },
+    url: DATABASE_URL
   },
 })
