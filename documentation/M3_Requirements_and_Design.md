@@ -18,7 +18,7 @@
 
 ### 3.1. Use-Case Diagram
 
-
+![alt text](./images/useCase.png)
 
 ### 3.2. Who’s Using It
 
@@ -51,7 +51,7 @@
   5. The student gets a confirmation message.
 - **What Could Go Wrong**:
   - If answers are incomplete or invalid, the system shows an error.
-  - If there’s a server error while saving, the student is told to try again later.
+  - If there’s a server error while saving, the student is taken to an error screen.
 
 #### 3. Generate Groups
 - **What It Is**:  
@@ -59,12 +59,12 @@
 - **How It Works**:
   1. The professor goes to the group generation page for a questionnaire.
   2. The system checks the professor’s login and loads all student answers.
-  3. The professor sets the desired group size (default is 2).
+  3. The professor sets the desired group size.
   4. The system calculates an average score for each submission, sorts them, and uses a greedy algorithm to create balanced groups.
   5. The groups (lists of student IDs) are saved in the `student_groups` table and shown to the professor.
 - **What Could Go Wrong**:
   - If the system can’t load submissions, it notifies the professor and stops the process.
-  - If the algorithm can’t form groups (due to few or unbalanced submissions), an error is shown with advice to adjust the settings.
+  - If the algorithm can’t form groups (due to a network error), an error message is shown.
 
 #### 4. View Questionnaire Details
 - **What It Is**:  
@@ -73,7 +73,7 @@
   1. The user goes to the questionnaire summary page.
   2. The user selects a questionnaire.
   3. The system retrieves all details from the SQL database.
-  4. The questionnaire, along with its questions and any answers, is displayed.
+  4. The questionnaire, along with its questions, is displayed.
 - **What Could Go Wrong**:
   - If the questionnaire can’t be found or loaded, the system shows an error message.
 
@@ -81,7 +81,17 @@
 
 ### 3.4. Screen Examples
 
+#### 1. Create questionnaire example
+![alt text](./images/createQuestionnaire.png)
 
+#### 2. Example of what submitting an answer to a question might look like, clicking next will submit
+![alt text](./images/submitAnswers.png)
+
+#### 3. Forming groups example 
+![alt text](./images/formGroups.png)
+
+#### 4. Survey details example (Example of questionnaire summary page below then clicking on the questionnaire will show more details as seen above in forming groups example)
+![alt text](./images/surveyDetails.png)
 
 ---
 
