@@ -26,16 +26,24 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import android.os.Handler
 import android.os.Looper
+import android.content.Context
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 
 
 class ProfessorActivity : ComponentActivity() {
-    private val questionList = mutableStateListOf<QuestionStep>()
+    companion object {
+        private const val TAG = "ProfActivity"
+    }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,7 +71,13 @@ class ProfessorActivity : ComponentActivity() {
         var surveyTitle by remember { mutableStateOf("") }
         var surveyDescription by remember { mutableStateOf("") }
         var questionTitle by remember { mutableStateOf("") }
-        var questionError by remember { mutableStateOf(false) } // Track format error
+        var surveyTitleError by remember { mutableStateOf(false) }
+        var surveyDescriptionError by remember { mutableStateOf(false) }
+        var questionError by remember { mutableStateOf(false) }
+        var surveySubmitAttempted by remember { mutableStateOf(false) }
+        val questionList = remember { mutableStateListOf<QuestionStep>() }
+        var networkErrorMessage by remember { mutableStateOf<String?>(null) }
+
         val context = LocalContext.current
 
         Column(
@@ -82,20 +96,44 @@ class ProfessorActivity : ComponentActivity() {
             // Survey Title Input
             OutlinedTextField(
                 value = surveyTitle,
-                onValueChange = { surveyTitle = it },
+                onValueChange = {
+                    surveyTitle = it
+                    surveyTitleError = it.isBlank()
+                },
                 label = { Text("Enter survey title") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                isError = surveyTitleError
             )
+            if (surveyTitleError) {
+                Text(
+                    "Title must not be empty!",
+                    color = Color.Red,
+                    fontSize = 12.sp,
+                    modifier = Modifier.align(Alignment.Start).padding(start = 8.dp, top = 4.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Survey Description Input
             OutlinedTextField(
                 value = surveyDescription,
-                onValueChange = { surveyDescription = it },
+                onValueChange = {
+                    surveyDescription = it
+                    surveyDescriptionError = it.isBlank()
+                },
                 label = { Text("Enter survey description") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                isError = surveyDescriptionError
             )
+            if (surveyDescriptionError) {
+                Text(
+                    "Description must not be empty!",
+                    color = Color.Red,
+                    fontSize = 12.sp,
+                    modifier = Modifier.align(Alignment.Start).padding(start = 8.dp, top = 4.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -115,20 +153,21 @@ class ProfessorActivity : ComponentActivity() {
                 value = questionTitle,
                 onValueChange = {
                     questionTitle = it
-                    questionError = !it.startsWith("On a scale of 1-5") // Validate format
+                    questionError = it.isBlank() || !it.startsWith("On a scale of 1-5")
                 },
                 label = { Text("Enter question") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = questionError
             )
 
-            // Error Message
+            // Error Message for Question Input
             if (questionError) {
                 Text(
-                    "Question must start with: \"On a scale of 1-5...\"",
+                    if (questionTitle.isBlank()) "Question must not be empty!"
+                    else "Question must start with: \"On a scale of 1-5...\"",
                     color = Color.Red,
                     fontSize = 12.sp,
-                    modifier = Modifier.align(Alignment.Start).padding(start = 8.dp)
+                    modifier = Modifier.align(Alignment.Start).padding(start = 8.dp, top = 4.dp)
                 )
             }
 
@@ -136,11 +175,8 @@ class ProfessorActivity : ComponentActivity() {
 
             // Add Question Button
             Button(onClick = {
-                if (questionTitle.isBlank()) {
-                    Toast.makeText(context, "Question cannot be empty!", Toast.LENGTH_SHORT).show()
-                } else if (questionError) {
-                    Toast.makeText(context, "Question must follow the required format!", Toast.LENGTH_SHORT).show()
-                } else {
+                questionError = questionTitle.isBlank() || !questionTitle.startsWith("On a scale of 1-5")
+                if (!questionError) {
                     questionList.add(
                         QuestionStep(
                             title = questionTitle,
@@ -155,6 +191,7 @@ class ProfessorActivity : ComponentActivity() {
                         )
                     )
                     questionTitle = "" // Reset input
+                    questionError = false // Remove error state
                 }
             }) {
                 Text("Add Question")
@@ -173,41 +210,68 @@ class ProfessorActivity : ComponentActivity() {
 
             // Submit Survey Button
             Button(onClick = {
-                if (surveyTitle.isBlank() || surveyDescription.isBlank()) {
-                    Toast.makeText(context, "Enter a title and description!", Toast.LENGTH_SHORT).show()
-                } else if (questionList.isEmpty()) {
-                    Toast.makeText(context, "Add at least one question!", Toast.LENGTH_SHORT).show()
-                } else {
-                    sendSurveyToAPI(surveyTitle, surveyDescription, questionList, navController)
+                surveySubmitAttempted = true
+                surveyTitleError = surveyTitle.isBlank()
+                surveyDescriptionError = surveyDescription.isBlank()
+
+                if (!surveyTitleError && !surveyDescriptionError && questionList.isNotEmpty()) {
+                    sendSurveyToAPI(context, surveyTitle, surveyDescription, questionList, navController, onFailure = { errorMessage ->
+                        networkErrorMessage = "Error submitting survey: $errorMessage"
+                    })
                 }
             }) {
                 Text("All Done! Create Survey")
+            }
+
+            // Error message if user tries to submit without questions
+            if (surveySubmitAttempted && (questionList.isEmpty() || networkErrorMessage != null)) {
+                Text(networkErrorMessage ?: "You must add at least one question before creating!",
+                    color = Color.Red,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center, // Ensures text is centered inside the Text composable
+                    modifier = Modifier
+                        .fillMaxWidth() // Makes sure it spans the full width for centering
+                        .padding(start = 8.dp, top = 4.dp)
+                        .align(Alignment.CenterHorizontally) // Centers the Text inside the Column
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(onClick = { navController.navigate("main_screen") }) {
+                Text("Back to Dashboard")
             }
         }
     }
 
     private fun sendSurveyToAPI(
+        context: Context,
         title: String,
         description: String,
         questions: List<QuestionStep>,
-        navController: NavController // Added for navigation
+        navController: NavController, // Added for navigation
+        onFailure: (String) -> Unit
     ) {
         val questionList = questions.map {
             QuestionText(questionText = it.title)
         }
 
         submitSurveyOkHttp(
+            context = context,
             title = title,
             description = description,
             questions = questionList,
             onSuccess = { questionnaireResponse ->
                 Handler(Looper.getMainLooper()).post {
-                    Log.d("Survey", "Survey submitted successfully: ${questionnaireResponse.id}")
+                    Log.d(TAG, "Survey submitted successfully: ${questionnaireResponse.id}")
                     navController.navigate("success_screen")
                 }
             },
             onFailure = { errorMessage ->
-                Log.e("Survey", "Error submitting survey: $errorMessage")
+                Handler(Looper.getMainLooper()).post {
+                    Log.e(TAG, "Error submitting survey: $errorMessage")
+                    onFailure(errorMessage)
+                }
             }
         )
     }
@@ -233,6 +297,7 @@ class ProfessorActivity : ComponentActivity() {
 
     @Composable
     fun MainScreen(navController: NavController) {
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -253,6 +318,13 @@ class ProfessorActivity : ComponentActivity() {
             Button(onClick = { navController.navigate("survey_screen") }) {
                 Text("Form Groups")
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            val activity = LocalActivity.current
+            Button(onClick = { activity?.finish() }) {
+                Text("Back to Role Selection")
+            }
         }
     }
 
@@ -260,16 +332,22 @@ class ProfessorActivity : ComponentActivity() {
     fun SurveyScreen(navController: NavController) {
         val questionnaires = remember { mutableStateListOf<Questionnaire>() }
         val context = LocalContext.current
+        var isLoading by remember { mutableStateOf(true) }
+        var errorMessage by remember { mutableStateOf<String?>(null) }
 
         // Fetch surveys when the screen is loaded
         LaunchedEffect(Unit) {
             fetchQuestionnaires(
+                context = context,
                 onSuccess = { fetchedSurveys ->
                     questionnaires.clear()
                     questionnaires.addAll(fetchedSurveys)
+                    isLoading = false
+                    errorMessage = null
                 },
-                onFailure = { errorMessage ->
-                    Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                onFailure = { error ->
+                    isLoading = false
+                    errorMessage = error
                 }
             )
         }
@@ -286,10 +364,11 @@ class ProfessorActivity : ComponentActivity() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (questionnaires.isEmpty()) {
-                Text("No surveys available.")
-            } else {
-                LazyColumn {
+            when {
+                isLoading -> Text("Fetching Surveys...", fontSize = 16.sp, color = Color.Black)
+                errorMessage != null -> Text("Error fetching surveys: $errorMessage", fontSize = 16.sp, color = Color.Red)
+                questionnaires.isEmpty() -> Text("No Surveys Available.", fontSize = 16.sp, color = Color.Black, modifier = Modifier.testTag("NoSurveysText"))
+                else -> LazyColumn {
                     items(questionnaires) { questionnaire ->
                         SurveyItem(questionnaire) {
                             navController.navigate("form_groups/${questionnaire.id}")
@@ -306,13 +385,15 @@ class ProfessorActivity : ComponentActivity() {
         }
     }
 
+
     @Composable
     fun SurveyItem(questionnaire: Questionnaire, onClick: () -> Unit) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(8.dp)
-                .clickable { onClick() },
+                .clickable { onClick() }
+                .semantics { contentDescription = "Survey Item" },
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -330,13 +411,10 @@ class ProfessorActivity : ComponentActivity() {
         var questionnaire by remember { mutableStateOf<QuestionnaireResponse?>(null) }
         val context = LocalContext.current
 
-        var groupSize by remember { mutableStateOf("") } // User input for group size
-        var isLoading by remember { mutableStateOf(false) } // Loading state
-        var groupResults by remember { mutableStateOf<List<List<Int>>?>(null) } // Store API response
-
         // Fetch questionnaire details
         LaunchedEffect(questionnaireId) {
             fetchQuestionnaire(
+                context = context,
                 questionnaireId = questionnaireId,
                 onSuccess = { survey -> questionnaire = survey },
                 onFailure = { errorMessage ->
@@ -374,32 +452,63 @@ class ProfessorActivity : ComponentActivity() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // User input field for group size
+            // State for group size input
+            var groupSizeError by remember { mutableStateOf(false) }
+            var networkErrorMessage by remember { mutableStateOf("") }
+            var groupSize by remember { mutableStateOf("") } // User input for group size
+            var isLoading by remember { mutableStateOf(false) } // Loading state
+            var groupResults by remember { mutableStateOf<List<List<Int>>?>(null) } // Store API response
+
+            // Input field for group size
             OutlinedTextField(
                 value = groupSize,
-                onValueChange = { groupSize = it.filter { char -> char.isDigit() } }, // Only allow numbers
+                onValueChange = {
+                    groupSize = it.filter { char -> char.isDigit() }
+
+                    if (groupSize.isNotEmpty() && groupSize.toIntOrNull() == 0) {
+                        groupSizeError = true
+                    } else {
+                        groupSizeError = false
+                    }
+                },
                 label = { Text("Enter Group Size") },
                 keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                isError = groupSizeError // Set error state based on validation
             )
+
+            // Error message if the group size is invalid
+            if (groupSizeError) {
+                Text(
+                    "Please enter a valid group size",
+                    color = Color.Red,
+                    fontSize = 12.sp,
+                    modifier = Modifier.align(Alignment.Start).padding(start = 8.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // "Form Groups" Button
             Button(
                 onClick = {
-                    if (groupSize.isNotEmpty() && groupSize.toIntOrNull() != null) {
-                        isLoading = true
-                        formGroups(questionnaireId, groupSize.toInt()) { result, error ->
-                            isLoading = false
-                            if (error != null) {
-                                Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
-                            } else {
-                                groupResults = result
-                            }
+                    if (groupSize.isEmpty() || groupSize.toIntOrNull() == null || groupSize.toInt() <= 0) {
+                        groupSizeError = true // Set error when the user tries to submit with invalid input
+                        return@Button
+                    }
+
+                    // Reset errors and perform the network request
+                    groupSizeError = false
+                    isLoading = true
+
+                    formGroups(context, questionnaireId, groupSize.toInt()) { result, error ->
+                        isLoading = false
+                        if (error != null) {
+                            networkErrorMessage = "Error forming groups: $error" // Store the network error message
+                        } else {
+                            groupResults = result // Set generated groups on success
+                            networkErrorMessage = "" // Reset network error message
                         }
-                    } else {
-                        Toast.makeText(context, "Please enter a valid group size", Toast.LENGTH_SHORT).show()
                     }
                 },
                 enabled = !isLoading
@@ -409,26 +518,33 @@ class ProfessorActivity : ComponentActivity() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Show group results
-            groupResults?.let { groups ->
-                Text("Generated Groups:", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                LazyColumn {
-                    itemsIndexed(groups) { index, group ->
-                        Text("Group ${index + 1}: ${group.joinToString(", ")}")
+            if (networkErrorMessage.isNotEmpty()) {
+                Text(
+                    networkErrorMessage,
+                    color = Color.Red,
+                    fontSize = 12.sp,
+                    modifier = Modifier.align(Alignment.Start).padding(start = 8.dp)
+                )
+            } else if (groupResults != null) {
+                // Show the generated groups if they exist
+                groupResults?.let { groups ->
+                    Text("Generated Groups:", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyColumn {
+                        itemsIndexed(groups) { index, group ->
+                            Text("Group ${index + 1}: ${group.joinToString(", ")}")
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Back Button
-            Button(onClick = { navController.navigate("review_screen") }) {
+            Button(onClick = { navController.navigate("survey_screen") }) {
                 Text("Back to List")
             }
         }
     }
-
 }
 
 

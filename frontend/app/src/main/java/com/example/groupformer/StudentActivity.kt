@@ -1,5 +1,6 @@
 package com.example.groupformer
 
+import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -30,13 +31,23 @@ import androidx.navigation.compose.rememberNavController
 import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.quickbirdstudios.surveykit.result.question_results.IntegerQuestionResult
 import com.quickbirdstudios.surveykit.result.question_results.ScaleQuestionResult
 
 class StudentActivity : ComponentActivity() {
+
+    companion object {
+        private const val TAG = "StudentActivity"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,7 +61,11 @@ class StudentActivity : ComponentActivity() {
                     composable("success_screen") { SuccessScreen(navController) }
                     composable("survey_screen/{questionnaireId}") { backStackEntry ->
                         val questionnaireId = backStackEntry.arguments?.getString("questionnaireId") ?: ""
-                        SurveyScreen(questionnaireId, navController) // Pass questionnaireId
+                        SurveyScreen(questionnaireId, navController)
+                    }
+                    composable("error_screen/{errorMessage}") { backStackEntry ->
+                        val errorMessage = backStackEntry.arguments?.getString("errorMessage") ?: "Unknown Error"
+                        ErrorScreen(navController, errorMessage)
                     }
                 }
             }
@@ -61,31 +76,43 @@ class StudentActivity : ComponentActivity() {
     fun MainScreen(navController: NavController) {
         val questionnaires = remember { mutableStateListOf<Questionnaire>() }
         val context = LocalContext.current
+        var isLoading by remember { mutableStateOf(true) }
+        var errorMessage by remember { mutableStateOf<String?>(null) }
 
+        // Fetch surveys when the screen is loaded
         LaunchedEffect(Unit) {
             fetchQuestionnaires(
+                context = context,
                 onSuccess = { fetchedSurveys ->
                     questionnaires.clear()
                     questionnaires.addAll(fetchedSurveys)
+                    isLoading = false
+                    errorMessage = null
                 },
-                onFailure = { errorMessage ->
-                    Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                onFailure = { error ->
+                    isLoading = false
+                    errorMessage = error
                 }
             )
         }
 
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(24.dp))
+
             Text("Surveys to choose", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (questionnaires.isEmpty()) {
-                Text("No surveys available.")
-            } else {
-                LazyColumn {
+            when {
+                isLoading -> Text("Fetching Surveys...", fontSize = 16.sp, color = Color.Black)
+                errorMessage != null -> Text("Error fetching surveys: $errorMessage", fontSize = 16.sp, color = Color.Red)
+                questionnaires.isEmpty() -> Text("No Surveys Available.", fontSize = 16.sp, color = Color.Black)
+                else -> LazyColumn {
                     items(questionnaires) { questionnaire ->
                         SurveyItem(questionnaire) {
                             navController.navigate("survey_screen/${questionnaire.id}")
@@ -96,8 +123,9 @@ class StudentActivity : ComponentActivity() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(onClick = { navController.navigate("main_screen") }) {
-                Text("Back to Dashboard")
+            val activity = LocalActivity.current
+            Button(onClick = { activity?.finish() }) {
+                Text("Back to Role Selection")
             }
         }
     }
@@ -127,7 +155,8 @@ class StudentActivity : ComponentActivity() {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(8.dp)
-                .clickable { onClick() },
+                .clickable { onClick() }
+                .semantics { contentDescription = "Survey Item" },
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -147,6 +176,7 @@ class StudentActivity : ComponentActivity() {
 
         LaunchedEffect(questionnaireId) {
             fetchQuestionnaire(
+                context,
                 questionnaireId,
                 onSuccess = { survey -> questionnaire = survey },
                 onFailure = { errorMessage ->
@@ -161,13 +191,19 @@ class StudentActivity : ComponentActivity() {
                 CircularProgressIndicator()
             }
         } else {
-            // Use AndroidView to integrate SurveyView
             AndroidView(
                 factory = { ctx ->
                     val surveyView = SurveyView(ctx)
                     surveyView.layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+
+                    val studentIdQuestion = QuestionStep(
+                        title = "Student ID",
+                        text = "Please enter your Student ID",
+                        answerFormat = IntegerAnswerFormat(), // Ensure integer input
+                        id = StepIdentifier("student_id")
                     )
 
                     val questionList = questionnaire!!.questions.map { question ->
@@ -190,12 +226,13 @@ class StudentActivity : ComponentActivity() {
                             title = "Welcome to ${questionnaire!!.title}",
                             text = questionnaire!!.description,
                             buttonText = "Start"
-                        )
+                        ),
+                        studentIdQuestion
                     ) + questionList + listOf(
                         CompletionStep(
                             title = "Survey Complete",
                             text = "Thank you for your responses!",
-                            buttonText = "Finish"
+                            buttonText = "Submit Answers"
                         )
                     )
 
@@ -203,8 +240,16 @@ class StudentActivity : ComponentActivity() {
 
                     surveyView.onSurveyFinish = { taskResult: TaskResult, reason: FinishReason ->
                         if (reason == FinishReason.Completed) {
+                            var studentId: Int? = null
                             val responses = taskResult.results.mapNotNull { stepResult ->
                                 val questionId = stepResult.id.id
+
+                                // Extract Student ID separately
+                                if (questionId == "student_id") {
+                                    studentId = (stepResult.results.firstOrNull() as? IntegerQuestionResult)?.answer
+                                    Log.d(TAG, "Collected Student ID: $studentId") // Log Student ID
+                                    return@mapNotNull null // Don't include in survey responses
+                                }
 
                                 val answer = when (val result = stepResult.results.firstOrNull()) {
                                     is ScaleQuestionResult -> result.answer?.toString()
@@ -214,13 +259,21 @@ class StudentActivity : ComponentActivity() {
                                 answer?.let { Answer(questionId, it) }
                             }
 
-                            // Send responses to API
-                            sendAnswersToAPI(questionnaire!!.id, responses)
-
-                            // Navigate to the success screen
-                            navController.navigate("success_screen")
+                            sendAnswersToAPI(
+                                context,
+                                questionnaire!!.id,
+                                responses,
+                                studentId!!,
+                                onSuccess = {
+                                    navController.navigate("success_screen")
+                                },
+                                onFailure = { errorMessage ->
+                                    navController.navigate("error_screen/$errorMessage")
+                                }
+                            )
                         } else {
-                            Log.d("Survey", "Survey was canceled")
+                            Log.d(TAG, "Survey was canceled")
+                            navController.navigate("main_screen")
                         }
                     }
 
@@ -233,23 +286,63 @@ class StudentActivity : ComponentActivity() {
                     surveyView.start(task, configuration)
                     surveyView
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("SurveyView")
             )
         }
     }
 
-    private fun sendAnswersToAPI(questionnaireId: String, answers: List<Answer>) {
+    private fun sendAnswersToAPI(context: Context, questionnaireId: String, answers: List<Answer>, studentId: Int, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
         submitAnswersOkHttp(
+            context = context,
             questionnaireId = questionnaireId,
             answers = answers,
+            studentId = studentId,
             onSuccess = {
                 Handler(Looper.getMainLooper()).post {
-                    Log.d("Survey", "Answers submitted successfully")
+                    onSuccess()
+                    Log.d(TAG, "Answers submitted successfully")
                 }
             },
             onFailure = { errorMessage ->
-                Log.e("Survey", "Error submitting answers: $errorMessage")
+                onFailure(errorMessage)
+                Log.e(TAG, "Error submitting answers: $errorMessage")
             }
         )
     }
 }
+
+@Composable
+fun ErrorScreen(navController: NavController, errorMessage: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Error Submitting Survey",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Red
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = errorMessage,
+            fontSize = 16.sp,
+            textAlign = TextAlign.Center,
+            color = Color.Red
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(onClick = { navController.navigate("main_screen") }) {
+            Text("Back to Main Screen")
+        }
+    }
+}
+
