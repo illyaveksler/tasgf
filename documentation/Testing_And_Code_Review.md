@@ -55,7 +55,7 @@
    npx sst dev
    ```
 
-Note: If you don't have a domain on AWS, you will need to also replace lines 24-30 in `sst.config.ts` with the following as well:
+Note: Since you won’t have my domain on AWS, you will need to also replace lines 24-30 in `sst.config.ts` with the following as well:
 ```
   loadBalancer: {
     rules: [
