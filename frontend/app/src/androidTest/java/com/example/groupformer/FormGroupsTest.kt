@@ -74,32 +74,16 @@ class FormGroupsTest {
 
         // Check for failure scenario (Internal Server Error)
         val mockErrorResponse = MockResponse()
-            .setResponseCode(500) // Internal Server Error
+            .setResponseCode(500)
             .setBody("Internal Server Error")
         mockWebServer.enqueue(mockErrorResponse)
 
-        composeTestRule.onNodeWithText("Back to Dashboard").performClick()
-
-        composeTestRule.onNodeWithText("Form Groups").performClick()
-
-        // Wait until "Choose a survey to form groups" text is visible
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithText("Choose a survey to form groups", useUnmergedTree = true)
-                .fetchSemanticsNodes()
-                .isNotEmpty()
-        }
-
-        // Check that the text "Choose a survey to form groups" is displayed
-        composeTestRule.onNodeWithText("Choose a survey to form groups").assertExists()
-
         // Verify the error message appears in the UI
-        composeTestRule.waitUntil(timeoutMillis = 20000) {
-            composeTestRule.onAllNodesWithText("Error fetching surveys: Error: Internal Server Error", useUnmergedTree = true)
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Error fetching surveys: Internal Server Error", useUnmergedTree = true)
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
-
-        composeTestRule.onNodeWithText("Back to Dashboard").performClick()
 
         // Prepare successful API Response
         val mockSurveyResponse = MockResponse()
@@ -124,9 +108,6 @@ class FormGroupsTest {
             )
         mockWebServer.enqueue(mockSurveyResponse)
 
-        // Click "Form Groups" button again
-        composeTestRule.onNodeWithText("Form Groups").performClick()
-
         // Wait for survey items to appear
         composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule.onAllNodesWithContentDescription("Survey Item").fetchSemanticsNodes()
@@ -138,7 +119,16 @@ class FormGroupsTest {
 
         // Wait for the survey details screen to load
         composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithText("Survey Details").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodes(hasTestTag("LoadingIndicator")).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Que bad response for loading Survey Details
+        mockWebServer.enqueue(mockErrorResponse)
+
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Error fetching survey: Internal Server Error", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
 
         // Mock response for Survey Details API
@@ -161,6 +151,10 @@ class FormGroupsTest {
         mockWebServer.enqueue(mockSurveyResponse3)
 
         // Check "Enter Group Size" field
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Enter Group Size").fetchSemanticsNodes().isNotEmpty()
+        }
+
         val groupSizeField = composeTestRule.onNodeWithText("Enter Group Size")
         groupSizeField.assertExists("Group Size input field not found!")
 
@@ -221,18 +215,13 @@ class FormGroupsTest {
             }
         }
 
-        // Prepare error response
-        val mockErrorResponse1 = MockResponse()
-            .setResponseCode(500) // Internal Server Error
-            .setBody("{ \"error\": \"Internal Server Error\" }")
-
-        mockWebServer.enqueue(mockErrorResponse1)
+        mockWebServer.enqueue(mockErrorResponse)
 
         // Check if error message pops up
         composeTestRule.onNodeWithText("Form Groups").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithText("Error forming groups: Error: 500").fetchSemanticsNodes()
+            composeTestRule.onAllNodesWithText("Error forming groups: Internal Server Error").fetchSemanticsNodes()
                 .isNotEmpty()
         }
     }

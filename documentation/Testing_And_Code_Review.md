@@ -163,7 +163,8 @@ After running the tests with coverage enabled (using `npm run coverage`), a repo
     | 4. User fills out 3 for group size | Find the TextField and enter 3  |
     | 5. System forms groups and displays groups of max 3 with Student Ids   |  Check that the text with "Groups: " shows up and each group has max 3 students  |
     | **Failure 2a:** No surveys to form groups | Check "No surveys Available" text shows up |
-    | **Failure 2b:** Network Error in fetching groups | Check for an "Error fetching surveys" text |
+    | **Failure 2b:** Network Error in fetching surveys | Check for an "Error fetching surveys" text |
+    | **Failure 3a:** Network Error in fetching survey details | Check for an "Error fetching survey" text |
     | **Failure 4a:** Forming group with empty input | Check for an error message saying "Please enter a valid group size" |
     | **Failure 5a:** Network Error in forming groups | Check for a network error message "Error forming groups" text |                       
 
@@ -171,11 +172,10 @@ After running the tests with coverage enabled (using `npm run coverage`), a repo
       ```
       > Task :app:connectedDebugAndroidTest
       Starting 1 tests on Pixel_9_API_31(AVD) - 12
-      Connected to process 8269 on device 'emulator-5554'.
 
       Finished 1 tests on Pixel_9_API_31(AVD) - 12
 
-      BUILD SUCCESSFUL in 13s
+      BUILD SUCCESSFUL in 16s
       69 actionable tasks: 1 executed, 68 up-to-date
 
       Build Analyzer results available
@@ -194,7 +194,8 @@ After running the tests with coverage enabled (using `npm run coverage`), a repo
     | 5. User submits Survey  | Find Submit Button and click it  |
     | 6. User gets to Success screen | Check for success text |
     | **Failure 1a:** No surveys to fill | Check "No surveys available" text shows up |
-    | **Failure 1b:** Network Error in fetching groups | Check for an "Error fetching surveys" text |
+    | **Failure 1b:** Network Error in fetching sruveys | Check for an "Error fetching surveys" text |
+    | **Failure 2a:** Network Error in fetching survey details | Check for an "Error fetching survey" text |
     | **Failure 5a:** Network Error in submitting Survey | Check "Error Submitting Survey" text (To check this failure, I created an extra test that does steps 1-5 but fails on step 5) |
 
 
@@ -206,7 +207,7 @@ After running the tests with coverage enabled (using `npm run coverage`), a repo
       Pixel_9_API_31(AVD) - 12 Tests 1/2 completed. (0 skipped) (0 failed)
       Finished 2 tests on Pixel_9_API_31(AVD) - 12
 
-      BUILD SUCCESSFUL in 26s
+      BUILD SUCCESSFUL in 27s
       69 actionable tasks: 1 executed, 68 up-to-date
 
       Build Analyzer results available
@@ -227,22 +228,23 @@ After running the tests with coverage enabled (using `npm run coverage`), a repo
     | **Failure 2a:** Title and Description are empty when trying to submit survey | Check for "Title/Description must not be empty" text |
     | **Failure 3a:** Question is empty or not in the right format when trying to add question | Check for "Question must not be empty" or "Question must start with: On a scale of 1-5" text |
     | **Failure 5a:** No questions were added before submitting survey | Check for "You must add at least one question before creating" text |
-    | **Failure 5b:** Network Error when submitting answers | Check for a network Error message text |
+    | **Failure 5b:** Network Error when submitting answers | Check for a "Error creating survey" message text |
 
 - **Test Logs:**
     ```
     > Task :app:connectedDebugAndroidTest
     Starting 1 tests on Pixel_9_API_31(AVD) - 12
 
+    Connected to process 20106 on device 'emulator-5554'.
     Finished 1 tests on Pixel_9_API_31(AVD) - 12
 
-    BUILD SUCCESSFUL in 16s
-    69 actionable tasks: 5 executed, 64 up-to-date
+    BUILD SUCCESSFUL in 17s
+    69 actionable tasks: 10 executed, 59 up-to-date
 
     Build Analyzer results available
     ```
 
-## 4. Summary of Testing
+## 5. Summary of Testing
 
 - **Questionnaires Module:**
   - Validates questionnaire creation, retrieval, and error handling.

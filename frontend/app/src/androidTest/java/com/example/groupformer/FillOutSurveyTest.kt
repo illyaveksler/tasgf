@@ -29,7 +29,7 @@ class FillOutSurveyTest {
 
     @Before
     fun setup() {
-        // Start the MockWebServer before the test
+        // Start a new instance of the mock server
         mockWebServer = MockWebServer()
         mockWebServer.start()
 
@@ -40,6 +40,7 @@ class FillOutSurveyTest {
 
         // Set a fake authentication token
         prefs.edit().putString("google_id_token", "mock_token_123").apply()
+
     }
 
     @After
@@ -59,19 +60,25 @@ class FillOutSurveyTest {
         // Navigate to "Student" screen
         composeTestRule.onNodeWithText("Student").performClick()
 
-        // Check for "Fetching then No Surveys Available" text
-        composeTestRule.waitUntil(timeoutMillis = 1000) {
-            composeTestRule.onAllNodesWithText("Fetching Surveys...").fetchSemanticsNodes().isEmpty()
-        }
+        // Check for "No Surveys Available" text
         composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule.onAllNodesWithText("No Surveys Available.").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("No Surveys Available.").assertExists()
 
-        // Click "Back to Role Selection" button to refresh page
-        composeTestRule.onNodeWithText("Back to Role Selection").performClick()
+        val mockErrorResponse = MockResponse()
+            .setResponseCode(500)
+            .setBody("Internal Server Error")
+        mockWebServer.enqueue(mockErrorResponse)
 
-        // Mock a new response with available surveys for when we reenter student page
+        // Verify the error message appears in the UI
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Error fetching surveys: Internal Server Error", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+
+        // Mock a new response with available surveys for student page
         val mockSurveyResponse = MockResponse()
             .setResponseCode(200)
             .setBody(
@@ -94,9 +101,6 @@ class FillOutSurveyTest {
             )
         mockWebServer.enqueue(mockSurveyResponse)
 
-        // Click "Student" button again to enter student page
-        composeTestRule.onNodeWithText("Student").performClick()
-
         // Wait for survey items to appear
         composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule.onAllNodesWithContentDescription("Survey Item").fetchSemanticsNodes()
@@ -105,6 +109,19 @@ class FillOutSurveyTest {
 
         // Click the first survey item
         composeTestRule.onAllNodesWithContentDescription("Survey Item")[0].performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasTestTag("LoadingIndicator")).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        mockWebServer.enqueue(mockErrorResponse)
+
+        // Verify the error message appears in the UI
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Error fetching survey: Internal Server Error", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
 
         // Mock response for Survey Details API
         val mockSurveyResponse2 = MockResponse()
@@ -123,6 +140,7 @@ class FillOutSurveyTest {
                 }
             """.trimIndent()
             )
+
         mockWebServer.enqueue(mockSurveyResponse2)
 
         // Wait for the survey details screen to load
@@ -161,11 +179,24 @@ class FillOutSurveyTest {
         }
     }
 
-    // This test is the same except it checks for when there's a network error submitting the survey
+    // This test is the same except it checks for when there's a network error at the end submitting the survey
     @Test
     fun errorSubmitSurveyTest() {
+        val emptySurveyResponse = MockResponse()
+            .setResponseCode(200)
+            .setBody("[]") // Empty list
+        mockWebServer.enqueue(emptySurveyResponse)
+
+        // Navigate to "Student" screen
         composeTestRule.onNodeWithText("Student").performClick()
 
+        // Check for "No Surveys Available" text
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("No Surveys Available.").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("No Surveys Available.").assertExists()
+
+        // Mock a new response with available surveys for student page
         val mockSurveyResponse = MockResponse()
             .setResponseCode(200)
             .setBody(
@@ -197,6 +228,10 @@ class FillOutSurveyTest {
         // Click the first survey item
         composeTestRule.onAllNodesWithContentDescription("Survey Item")[0].performClick()
 
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasTestTag("LoadingIndicator")).fetchSemanticsNodes().isNotEmpty()
+        }
+
         // Mock response for Survey Details API
         val mockSurveyResponse2 = MockResponse()
             .setResponseCode(200)
@@ -214,6 +249,7 @@ class FillOutSurveyTest {
                 }
             """.trimIndent()
             )
+
         mockWebServer.enqueue(mockSurveyResponse2)
 
         // Wait for the survey details screen to load
@@ -221,7 +257,7 @@ class FillOutSurveyTest {
             composeTestRule.onAllNodesWithTag("SurveyView").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Start survey by finding button
+        // Start survey by finding start button and clicking
         onView(withText("Start")).perform(click())
 
         // Enter Student ID (e.g., "12345") and press Next
@@ -230,14 +266,13 @@ class FillOutSurveyTest {
         onView(withText("Next")).perform(click())
 
         Thread.sleep(1000)
-        // Answer first question
+        // Answer first question by pressing Next
         onView(withText("Next")).perform(click())
 
-        // Answer second question
         Thread.sleep(1000)
+        // Answer second question by pressing Next
         onView(withText("Next")).perform(click())
 
-        // Prepare error response
         val mockErrorResponse = MockResponse()
             .setResponseCode(500) // Internal Server Error
             .setBody("Internal Server Error")
@@ -250,5 +285,6 @@ class FillOutSurveyTest {
         composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule.onAllNodesWithText("Error Submitting Survey").fetchSemanticsNodes().isNotEmpty()
         }
+
     }
 }

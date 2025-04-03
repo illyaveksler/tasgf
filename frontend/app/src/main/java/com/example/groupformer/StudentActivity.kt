@@ -3,7 +3,6 @@ package com.example.groupformer
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -40,6 +39,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.quickbirdstudios.surveykit.result.question_results.IntegerQuestionResult
 import com.quickbirdstudios.surveykit.result.question_results.ScaleQuestionResult
 import kotlinx.coroutines.delay
@@ -64,10 +64,7 @@ class StudentActivity : ComponentActivity() {
                         val questionnaireId = backStackEntry.arguments?.getString("questionnaireId") ?: ""
                         SurveyScreen(questionnaireId, navController)
                     }
-                    composable("error_screen/{errorMessage}") { backStackEntry ->
-                        val errorMessage = backStackEntry.arguments?.getString("errorMessage") ?: "Unknown Error"
-                        ErrorScreen(navController, errorMessage)
-                    }
+                    composable("error_screen") { ErrorScreen(navController) }
                 }
             }
         }
@@ -79,24 +76,27 @@ class StudentActivity : ComponentActivity() {
         val context = LocalContext.current
         var isLoading by remember { mutableStateOf(true) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
+        val currentBackStackEntry by navController.currentBackStackEntryAsState()
 
         // Fetch surveys when the screen is loaded
-        LaunchedEffect(Unit) {
-            while (true) {
-                fetchQuestionnaires(
-                    context = context,
-                    onSuccess = { fetchedSurveys ->
-                        questionnaires.clear()
-                        questionnaires.addAll(fetchedSurveys)
-                        isLoading = false
-                        errorMessage = null
-                    },
-                    onFailure = { error ->
-                        isLoading = false
-                        errorMessage = error
-                    }
-                )
-                delay(1000L) // Refresh every 1 second
+        LaunchedEffect(currentBackStackEntry?.destination?.route) {
+            if (currentBackStackEntry?.destination?.route == "main_screen") {
+                while (true) {
+                    fetchQuestionnaires(
+                        context = context,
+                        onSuccess = { fetchedSurveys ->
+                            questionnaires.clear()
+                            questionnaires.addAll(fetchedSurveys)
+                            isLoading = false
+                            errorMessage = null
+                        },
+                        onFailure = { error ->
+                            isLoading = false
+                            errorMessage = error
+                        }
+                    )
+                    delay(1000L) // Refresh every 1 second
+                }
             }
         }
 
@@ -114,7 +114,7 @@ class StudentActivity : ComponentActivity() {
 
             when {
                 isLoading -> Text("Fetching Surveys...", fontSize = 16.sp, color = Color.Black)
-                errorMessage != null -> Text("Error fetching surveys: $errorMessage", fontSize = 16.sp, color = Color.Red)
+                errorMessage != null -> Text("$errorMessage", fontSize = 16.sp, color = Color.Red)
                 questionnaires.isEmpty() -> Text("No Surveys Available.", fontSize = 16.sp, color = Color.Black)
                 else -> LazyColumn {
                     items(questionnaires) { questionnaire ->
@@ -176,23 +176,63 @@ class StudentActivity : ComponentActivity() {
     @Composable
     fun SurveyScreen(questionnaireId: String, navController: NavController) {
         val context = LocalContext.current
+        var isLoading by remember { mutableStateOf(true) }
         var questionnaire by remember { mutableStateOf<QuestionnaireResponse?>(null) }
+        var errorMessage by remember { mutableStateOf<String?>(null) }
 
+        // This effect will only be triggered when the screen is first composed or questionnaireId changes
         LaunchedEffect(questionnaireId) {
+            // Fetch questionnaire when the screen is loaded
             fetchQuestionnaire(
-                context,
-                questionnaireId,
-                onSuccess = { survey -> questionnaire = survey },
-                onFailure = { errorMessage ->
-                    Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                context = context,
+                questionnaireId = questionnaireId,
+                onSuccess = { survey ->
+                    questionnaire = survey
+                    isLoading = false
+                    errorMessage = null
+                },
+                onFailure = { error ->
+                    isLoading = false
+                    errorMessage = error
+                    questionnaire = null // Reset questionnaire if there’s an error
                 }
             )
         }
 
-        // Show loading until questionnaire is available
-        if (questionnaire == null) {
+        // Polling logic: Retry every 1 second if there's an error or no questionnaire
+        LaunchedEffect(errorMessage) {
+            if (errorMessage != null) {
+                delay(1000L) // Retry after a 1 second delay
+                fetchQuestionnaire(
+                    context = context,
+                    questionnaireId = questionnaireId,
+                    onSuccess = { survey ->
+                        questionnaire = survey
+                        isLoading = false
+                        errorMessage = null
+                    },
+                    onFailure = { error ->
+                        isLoading = false
+                        errorMessage = error
+                        questionnaire = null // Reset questionnaire if there’s an error
+                    }
+                )
+            }
+        }
+
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize().testTag("LoadingIndicator"), contentAlignment = Alignment.Center) {
+                Text(text = "Loading Questionnaire...", fontSize = 18.sp, color = Color.Gray)
+            }
+        } else if (errorMessage != null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = "$errorMessage", color = Color.Red, fontSize = 16.sp)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = { navController.navigate("main_screen") }) {
+                        Text("Go back to Main Screen")
+                    }
+                }
             }
         } else {
             AndroidView(
@@ -251,7 +291,6 @@ class StudentActivity : ComponentActivity() {
                                 // Extract Student ID separately
                                 if (questionId == "student_id") {
                                     studentId = (stepResult.results.firstOrNull() as? IntegerQuestionResult)?.answer
-                                    Log.d(TAG, "Collected Student ID: $studentId") // Log Student ID
                                     return@mapNotNull null // Don't include in survey responses
                                 }
 
@@ -272,7 +311,8 @@ class StudentActivity : ComponentActivity() {
                                     navController.navigate("success_screen")
                                 },
                                 onFailure = { errorMessage ->
-                                    navController.navigate("error_screen/$errorMessage")
+                                    navController.navigate("error_screen?errorMessage=$errorMessage")
+                                    Log.e(TAG, "Error submitting answers: $errorMessage")
                                 }
                             )
                         } else {
@@ -318,7 +358,9 @@ class StudentActivity : ComponentActivity() {
 }
 
 @Composable
-fun ErrorScreen(navController: NavController, errorMessage: String) {
+fun ErrorScreen(navController: NavController) {
+
+    val errorMessage = navController.previousBackStackEntry?.arguments?.getString("errorMessage") ?: "Unknown error occurred"
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -345,7 +387,7 @@ fun ErrorScreen(navController: NavController, errorMessage: String) {
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(onClick = { navController.navigate("main_screen") }) {
-            Text("Back to Main Screen")
+            Text("Back to Main Page")
         }
     }
 }

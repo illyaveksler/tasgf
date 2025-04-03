@@ -13,7 +13,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
 
-
 private const val TAG = "SurveyAPI"
 
 object OkHttpClientInstance {
@@ -26,10 +25,10 @@ fun getAuthorizedRequest(context: Context, endpoint: String, method: String, bod
     val baseUrl = sharedPreferences.getString("api_base_url", "https://sendsock.com")!!  // Default to real API
     val url = "$baseUrl$endpoint"
 
+    Log.d(TAG, "Endpoint triggered: $endpoint")
     val builder = Request.Builder()
         .url(url)
         .header("Authorization", "Bearer $token")
-    Log.d(TAG, "Token: $token")
 
     when (method) {
         "POST" -> builder.post(body!!)
@@ -68,8 +67,8 @@ fun submitSurveyOkHttp(
             response.use {
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: "Unknown error"
-                    Log.e(TAG, "Error: $errorBody")
-                    Handler(Looper.getMainLooper()).post { onFailure("Error: $errorBody") }
+                    Log.e(TAG, "Error submitting survey: $errorBody")
+                    Handler(Looper.getMainLooper()).post { onFailure("Error creating survey: $errorBody") }
                     return
                 }
                 val responseBody = response.body?.string()
@@ -97,7 +96,7 @@ fun fetchQuestionnaires(context: Context, onSuccess: (List<Questionnaire>) -> Un
                 if (!response.isSuccessful) {
                     val errorBody = responseBody ?: "Unknown error"
                     Log.e(TAG, "Error: $errorBody")
-                    Handler(Looper.getMainLooper()).post { onFailure("Error: $errorBody") }
+                    Handler(Looper.getMainLooper()).post { onFailure("Error fetching surveys: $errorBody") }
                     return
                 }
 
@@ -133,7 +132,7 @@ fun fetchQuestionnaire(
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: "Unknown error"
                     Log.e(TAG, "Error: $errorBody")
-                    Handler(Looper.getMainLooper()).post { onFailure("Error: $errorBody") }
+                    Handler(Looper.getMainLooper()).post { onFailure("Error fetching survey: $errorBody") }
                     return
                 }
 
@@ -196,7 +195,13 @@ fun formGroups(
         override fun onResponse(call: Call, response: Response) {
             response.use {
                 if (!it.isSuccessful) {
-                    Handler(Looper.getMainLooper()).post { onResult(null, "Error: ${it.code}") }
+                    try {
+                        val errorBody = it.body?.string()
+                        Handler(Looper.getMainLooper()).post { onResult(null, "Error forming groups: $errorBody") }
+                    } catch (e: Exception) {
+                        // If there's an error parsing the error body, fall back to using the status code
+                        Handler(Looper.getMainLooper()).post { onResult(null, "Error forming groups: ${it.code}") }
+                    }
                     return
                 }
                 val responseBody = it.body?.string()
@@ -215,7 +220,7 @@ fun formGroups(
                     }
                     Handler(Looper.getMainLooper()).post { onResult(groupData, null) }
                 } catch (e: Exception) {
-                    Handler(Looper.getMainLooper()).post { onResult(null, "Parsing error: ${e.message}") }
+                    Handler(Looper.getMainLooper()).post { onResult(null, "Error forming groups: {Parsing error: ${e.message}}") }
                 }
             }
         }

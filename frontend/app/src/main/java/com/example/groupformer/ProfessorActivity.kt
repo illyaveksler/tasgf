@@ -2,7 +2,6 @@ package com.example.groupformer
 
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,6 +36,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.navigation.compose.currentBackStackEntryAsState
 import kotlinx.coroutines.delay
 
 
@@ -44,7 +44,6 @@ class ProfessorActivity : ComponentActivity() {
     companion object {
         private const val TAG = "ProfActivity"
     }
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -217,7 +216,7 @@ class ProfessorActivity : ComponentActivity() {
 
                 if (!surveyTitleError && !surveyDescriptionError && questionList.isNotEmpty()) {
                     sendSurveyToAPI(context, surveyTitle, surveyDescription, questionList, navController, onFailure = { errorMessage ->
-                        networkErrorMessage = "Error submitting survey: $errorMessage"
+                        networkErrorMessage = errorMessage
                     })
                 }
             }) {
@@ -335,24 +334,27 @@ class ProfessorActivity : ComponentActivity() {
         val context = LocalContext.current
         var isLoading by remember { mutableStateOf(true) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
+        val currentBackStackEntry by navController.currentBackStackEntryAsState()
 
         // Fetch surveys when the screen is loaded
-        LaunchedEffect(Unit) {
-            while (true) {
-                fetchQuestionnaires(
-                    context = context,
-                    onSuccess = { fetchedSurveys ->
-                        questionnaires.clear()
-                        questionnaires.addAll(fetchedSurveys)
-                        isLoading = false
-                        errorMessage = null
-                    },
-                    onFailure = { error ->
-                        isLoading = false
-                        errorMessage = error
-                    }
-                )
-                delay(1000L) // Refresh every 1 seconds
+        LaunchedEffect(currentBackStackEntry?.destination?.route) {
+            if (currentBackStackEntry?.destination?.route == "survey_screen") {
+                while (true) {
+                    fetchQuestionnaires(
+                        context = context,
+                        onSuccess = { fetchedSurveys ->
+                            questionnaires.clear()
+                            questionnaires.addAll(fetchedSurveys)
+                            isLoading = false
+                            errorMessage = null
+                        },
+                        onFailure = { error ->
+                            isLoading = false
+                            errorMessage = error
+                        }
+                    )
+                    delay(1000L) // Refresh every 1 second
+                }
             }
         }
 
@@ -370,7 +372,7 @@ class ProfessorActivity : ComponentActivity() {
 
             when {
                 isLoading -> Text("Fetching Surveys...", fontSize = 16.sp, color = Color.Black)
-                errorMessage != null -> Text("Error fetching surveys: $errorMessage", fontSize = 16.sp, color = Color.Red)
+                errorMessage != null -> Text("$errorMessage", fontSize = 16.sp, color = Color.Red)
                 questionnaires.isEmpty() -> Text("No Surveys Available.", fontSize = 16.sp, color = Color.Black, modifier = Modifier.testTag("NoSurveysText"))
                 else -> LazyColumn {
                     items(questionnaires) { questionnaire ->
@@ -412,140 +414,181 @@ class ProfessorActivity : ComponentActivity() {
 
     @Composable
     fun FormGroupsScreen(navController: NavController, questionnaireId: String) {
-        var questionnaire by remember { mutableStateOf<QuestionnaireResponse?>(null) }
         val context = LocalContext.current
+        var isLoading by remember { mutableStateOf(true) }
+        var questionnaire by remember { mutableStateOf<QuestionnaireResponse?>(null) }
+        var errorMessage by remember { mutableStateOf<String?>(null) }
 
         // Fetch questionnaire details
         LaunchedEffect(questionnaireId) {
+            // Fetch questionnaire when the screen is loaded
             fetchQuestionnaire(
                 context = context,
                 questionnaireId = questionnaireId,
-                onSuccess = { survey -> questionnaire = survey },
-                onFailure = { errorMessage ->
-                    Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                onSuccess = { survey ->
+                    questionnaire = survey
+                    isLoading = false
+                    errorMessage = null
+                },
+                onFailure = { error ->
+                    isLoading = false
+                    errorMessage = error
+                    questionnaire = null // Reset questionnaire if there’s an error
                 }
             )
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text("Survey Details", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            questionnaire?.let { survey ->
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Title: ${survey.title}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text("Description: ${survey.description}", fontSize = 16.sp)
-                Text("Created At: ${survey.createdAt}", fontSize = 14.sp, color = Color.Gray)
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Display the list of questions
-                Text("Survey Questions:", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                LazyColumn {
-                    items(survey.questions) { question ->
-                        Text("- ${question.questionText}", fontSize = 16.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
+        // Polling logic: Retry every 1 second if there's an error or no questionnaire
+        LaunchedEffect(errorMessage) {
+            if (errorMessage != null) {
+                delay(1000L) // Retry after a 1 second delay
+                fetchQuestionnaire(
+                    context = context,
+                    questionnaireId = questionnaireId,
+                    onSuccess = { survey ->
+                        questionnaire = survey
+                        isLoading = false
+                        errorMessage = null
+                    },
+                    onFailure = { error ->
+                        isLoading = false
+                        errorMessage = error
+                        questionnaire = null // Reset questionnaire if there’s an error
+                    }
+                )
+            }
+        }
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize().testTag("LoadingIndicator"), contentAlignment = Alignment.Center) {
+                Text(text = "Loading Questionnaire...", fontSize = 18.sp, color = Color.Gray)
+            }
+        } else if (errorMessage != null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = "$errorMessage", color = Color.Red, fontSize = 16.sp)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = { navController.navigate("survey_screen") }) {
+                        Text("Back to List")
                     }
                 }
-            } ?: Text("Loading...")
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // State for group size input
-            var groupSizeError by remember { mutableStateOf(false) }
-            var networkErrorMessage by remember { mutableStateOf("") }
-            var groupSize by remember { mutableStateOf("") } // User input for group size
-            var isLoading by remember { mutableStateOf(false) } // Loading state
-            var groupResults by remember { mutableStateOf<List<List<Int>>?>(null) } // Store API response
-
-            // Input field for group size
-            OutlinedTextField(
-                value = groupSize,
-                onValueChange = {
-                    groupSize = it.filter { char -> char.isDigit() }
-
-                    if (groupSize.isNotEmpty() && groupSize.toIntOrNull() == 0) {
-                        groupSizeError = true
-                    } else {
-                        groupSizeError = false
-                    }
-                },
-                label = { Text("Enter Group Size") },
-                keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-                isError = groupSizeError // Set error state based on validation
-            )
-
-            // Error message if the group size is invalid
-            if (groupSizeError) {
-                Text(
-                    "Please enter a valid group size",
-                    color = Color.Red,
-                    fontSize = 12.sp,
-                    modifier = Modifier.align(Alignment.Start).padding(start = 8.dp)
-                )
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // "Form Groups" Button
-            Button(
-                onClick = {
-                    if (groupSize.isEmpty() || groupSize.toIntOrNull() == null || groupSize.toInt() <= 0) {
-                        groupSizeError = true // Set error when the user tries to submit with invalid input
-                        return@Button
-                    }
-
-                    // Reset errors and perform the network request
-                    groupSizeError = false
-                    isLoading = true
-
-                    formGroups(context, questionnaireId, groupSize.toInt()) { result, error ->
-                        isLoading = false
-                        if (error != null) {
-                            networkErrorMessage = "Error forming groups: $error" // Store the network error message
-                        } else {
-                            groupResults = result // Set generated groups on success
-                            networkErrorMessage = "" // Reset network error message
-                        }
-                    }
-                },
-                enabled = !isLoading
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(if (isLoading) "Forming Groups..." else "Form Groups")
-            }
+                Spacer(modifier = Modifier.height(24.dp))
+                Text("Survey Details", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                questionnaire?.let { survey ->
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Title: ${survey.title}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("Description: ${survey.description}", fontSize = 16.sp)
+                    Text("Created At: ${survey.createdAt}", fontSize = 14.sp, color = Color.Gray)
 
-            Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-            if (networkErrorMessage.isNotEmpty()) {
-                Text(
-                    networkErrorMessage,
-                    color = Color.Red,
-                    fontSize = 12.sp,
-                    modifier = Modifier.align(Alignment.Start).padding(start = 8.dp)
-                )
-            } else if (groupResults != null) {
-                // Show the generated groups if they exist
-                groupResults?.let { groups ->
-                    Text("Generated Groups:", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    // Display the list of questions
+                    Text("Survey Questions:", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyColumn {
-                        itemsIndexed(groups) { index, group ->
-                            Text("Group ${index + 1}: ${group.joinToString(", ")}")
+                        items(survey.questions) { question ->
+                            Text("- ${question.questionText}", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    }
+                } ?: Text("Loading...")
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // State for group size input
+                var groupSizeError by remember { mutableStateOf(false) }
+                var networkErrorMessage by remember { mutableStateOf("") }
+                var groupSize by remember { mutableStateOf("") } // User input for group size
+                var groupLoading by remember { mutableStateOf(false) } // Loading state
+                var groupResults by remember { mutableStateOf<List<List<Int>>?>(null) } // Store API response
+
+                // Input field for group size
+                OutlinedTextField(
+                    value = groupSize,
+                    onValueChange = {
+                        groupSize = it.filter { char -> char.isDigit() }
+                        groupSizeError = (groupSize.isNotEmpty() && groupSize.toIntOrNull() == 0)
+                    },
+                    label = { Text("Enter Group Size") },
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = groupSizeError // Set error state based on validation
+                )
+
+                // Error message if the group size is invalid
+                if (groupSizeError) {
+                    Text(
+                        "Please enter a valid group size",
+                        color = Color.Red,
+                        fontSize = 12.sp,
+                        modifier = Modifier.align(Alignment.Start).padding(start = 8.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // "Form Groups" Button
+                Button(
+                    onClick = {
+                        if (groupSize.isEmpty() || groupSize.toIntOrNull() == null || groupSize.toInt() <= 0) {
+                            groupSizeError =
+                                true // Set error when the user tries to submit with invalid input
+                            return@Button
+                        }
+
+                        // Reset errors and perform the network request
+                        groupSizeError = false
+                        groupLoading = true
+
+                        formGroups(context, questionnaireId, groupSize.toInt()) { result, error ->
+                            groupLoading = false
+                            if (error != null) {
+                                networkErrorMessage = error // Store the network error message
+                            } else {
+                                groupResults = result // Set generated groups on success
+                                networkErrorMessage = "" // Reset network error message
+                            }
+                        }
+                    },
+                    enabled = !groupLoading
+                ) {
+                    Text(if (groupLoading) "Forming Groups..." else "Form Groups")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (networkErrorMessage.isNotEmpty()) {
+                    Text(
+                        networkErrorMessage,
+                        color = Color.Red,
+                        fontSize = 12.sp,
+                        modifier = Modifier.align(Alignment.Start).padding(start = 8.dp)
+                    )
+                } else if (groupResults != null) {
+                    // Show the generated groups if they exist
+                    groupResults?.let { groups ->
+                        Text("Generated Groups:", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyColumn {
+                            itemsIndexed(groups) { index, group ->
+                                Text("Group ${index + 1}: ${group.joinToString(", ")}")
+                            }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Button(onClick = { navController.navigate("survey_screen") }) {
-                Text("Back to List")
+                Button(onClick = { navController.navigate("survey_screen") }) {
+                    Text("Back to List")
+                }
             }
         }
     }

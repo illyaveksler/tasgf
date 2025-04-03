@@ -144,9 +144,9 @@ class CreateSurveyTest {
 
         // Check for network error message
         composeTestRule.waitUntil(timeoutMillis = 10000) {
-            composeTestRule.onAllNodesWithText("Error submitting survey: Error: Internal Server Error").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Error creating survey: Internal Server Error").fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onNodeWithText("Error submitting survey: Error: Internal Server Error").assertExists()
+        composeTestRule.onNodeWithText("Error creating survey: Internal Server Error").assertExists()
 
         // Prepare proper api response
         val successfulSubmitResponse = MockResponse()
