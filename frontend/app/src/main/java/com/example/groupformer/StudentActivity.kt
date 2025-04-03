@@ -42,6 +42,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.quickbirdstudios.surveykit.result.question_results.IntegerQuestionResult
 import com.quickbirdstudios.surveykit.result.question_results.ScaleQuestionResult
+import kotlinx.coroutines.delay
 
 class StudentActivity : ComponentActivity() {
 
@@ -81,19 +82,22 @@ class StudentActivity : ComponentActivity() {
 
         // Fetch surveys when the screen is loaded
         LaunchedEffect(Unit) {
-            fetchQuestionnaires(
-                context = context,
-                onSuccess = { fetchedSurveys ->
-                    questionnaires.clear()
-                    questionnaires.addAll(fetchedSurveys)
-                    isLoading = false
-                    errorMessage = null
-                },
-                onFailure = { error ->
-                    isLoading = false
-                    errorMessage = error
-                }
-            )
+            while (true) {
+                fetchQuestionnaires(
+                    context = context,
+                    onSuccess = { fetchedSurveys ->
+                        questionnaires.clear()
+                        questionnaires.addAll(fetchedSurveys)
+                        isLoading = false
+                        errorMessage = null
+                    },
+                    onFailure = { error ->
+                        isLoading = false
+                        errorMessage = error
+                    }
+                )
+                delay(1000L) // Refresh every 1 second
+            }
         }
 
         Column(

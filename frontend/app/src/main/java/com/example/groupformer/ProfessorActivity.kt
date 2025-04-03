@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
+import kotlinx.coroutines.delay
 
 
 class ProfessorActivity : ComponentActivity() {
@@ -337,19 +338,22 @@ class ProfessorActivity : ComponentActivity() {
 
         // Fetch surveys when the screen is loaded
         LaunchedEffect(Unit) {
-            fetchQuestionnaires(
-                context = context,
-                onSuccess = { fetchedSurveys ->
-                    questionnaires.clear()
-                    questionnaires.addAll(fetchedSurveys)
-                    isLoading = false
-                    errorMessage = null
-                },
-                onFailure = { error ->
-                    isLoading = false
-                    errorMessage = error
-                }
-            )
+            while (true) {
+                fetchQuestionnaires(
+                    context = context,
+                    onSuccess = { fetchedSurveys ->
+                        questionnaires.clear()
+                        questionnaires.addAll(fetchedSurveys)
+                        isLoading = false
+                        errorMessage = null
+                    },
+                    onFailure = { error ->
+                        isLoading = false
+                        errorMessage = error
+                    }
+                )
+                delay(1000L) // Refresh every 1 seconds
+            }
         }
 
         Column(
